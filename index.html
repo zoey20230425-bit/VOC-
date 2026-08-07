@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>应用商店低分VOC监测</title>
-<!-- V0.8: 总览增加商店评分信号 + 评论信号 -->
+<!-- V0.9: 总览重构为异常诊断 + 分渠道趋势；全部APP不混合评分 -->
 <style>
 :root{
   --bg:#f6f7f9;--panel:#fff;--ink:#17191d;--muted:#747b85;--line:#e6e9ee;
@@ -85,7 +85,27 @@ th{position:sticky;top:0;background:#f8f9fb;color:#666d77;text-align:left;paddin
 .mini-title{font-size:11px;font-weight:700;margin-bottom:5px}.mini-sub{font-size:10px;color:var(--muted)}
 .mini-chart{height:110px;margin-top:5px}
 
-@media(max-width:1050px){.grid4,.app-status{grid-template-columns:repeat(2,1fr)}.main,.summary-row,.ai-grid,.health-grid,.overview-bottom,.mini-grid{grid-template-columns:1fr}}
+
+.diag-table{width:100%;border-collapse:collapse;font-size:11px}
+.diag-table th{position:static;background:#f8f9fb;padding:8px;border-bottom:1px solid var(--line);color:#666d77}
+.diag-table td{padding:9px 8px;border-bottom:1px solid #eff1f4}
+.diag-detail{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafbfc;font-size:11px;line-height:1.6;color:#5d6470}
+.channel-trends{display:grid;gap:10px}
+.channel-trend-card{border:1px solid var(--line);border-radius:11px;padding:11px;background:#fff}
+.ct-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ct-head b{font-size:12px}.ct-score{font-size:18px;font-weight:780}.ct-meta{font-size:10px;color:var(--muted)}
+.ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ct-mini{border:1px solid #eef0f3;border-radius:9px;padding:8px;background:#fafbfc}
+.ct-mini .t{font-size:10px;color:var(--muted);margin-bottom:4px}.ct-mini .v{font-size:13px;font-weight:750}
+.ct-spark{height:64px;margin-top:5px}
+.allapps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.allapp-card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+.allapp-card h3{font-size:12px;margin:0 0 10px}
+.channel-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #eff1f4;font-size:10px}
+.channel-row:first-of-type{border-top:0}
+.channel-row .r{text-align:right}
+
+@media(max-width:1050px){.grid4,.app-status,.allapps-grid{grid-template-columns:repeat(2,1fr)}.main,.summary-row,.ai-grid,.health-grid,.overview-bottom,.mini-grid,.ct-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -134,74 +154,77 @@ th{position:sticky;top:0;background:#f8f9fb;color:#666d77;text-align:left;paddin
   </div>
 
   <section id="overview" class="panel active">
-    <div class="health-grid">
-      <div class="health-card">
-        <div class="health-head">
-          <b>Google Play</b>
-          <span class="badge good" id="gpStatus">正常</span>
+    <div id="singleAppOverview">
+      <div class="health-grid">
+        <div class="health-card">
+          <div class="health-head"><b>Google Play</b><span class="badge good" id="gpStatus">正常</span></div>
+          <div class="kt">当前商店评分</div>
+          <div class="health-score" id="gpStoreRating">—</div>
+          <div class="health-change" id="gpStoreChange">—</div>
+          <div class="health-metrics">
+            <div class="hm"><div class="l">今日文字评论</div><div class="v" id="gpReviews">—</div></div>
+            <div class="hm"><div class="l">1–2星评论</div><div class="v" id="gpLow">—</div></div>
+            <div class="hm"><div class="l">低分占比</div><div class="v" id="gpLowShare">—</div></div>
+          </div>
+          <div class="health-status small" id="gpHealthNote">—</div>
         </div>
-        <div class="kt">当前商店评分</div>
-        <div class="health-score" id="gpStoreRating">—</div>
-        <div class="health-change" id="gpStoreChange">—</div>
-        <div class="health-metrics">
-          <div class="hm"><div class="l">今日文字评论</div><div class="v" id="gpReviews">—</div></div>
-          <div class="hm"><div class="l">1–2星评论</div><div class="v" id="gpLow">—</div></div>
-          <div class="hm"><div class="l">低分占比</div><div class="v" id="gpLowShare">—</div></div>
+
+        <div class="health-card">
+          <div class="health-head"><b>App Store</b><span class="badge good" id="asStatus">正常</span></div>
+          <div class="kt">当前商店评分</div>
+          <div class="health-score" id="asStoreRating">—</div>
+          <div class="health-change" id="asStoreChange">—</div>
+          <div class="health-metrics">
+            <div class="hm"><div class="l">今日文字评论</div><div class="v" id="asReviews">—</div></div>
+            <div class="hm"><div class="l">1–2星评论</div><div class="v" id="asLow">—</div></div>
+            <div class="hm"><div class="l">低分占比</div><div class="v" id="asLowShare">—</div></div>
+          </div>
+          <div class="health-status small" id="asHealthNote">—</div>
         </div>
-        <div class="health-status small" id="gpHealthNote">—</div>
       </div>
 
-      <div class="health-card">
-        <div class="health-head">
-          <b>App Store</b>
-          <span class="badge good" id="asStatus">正常</span>
+      <div class="overview-bottom">
+        <div class="card">
+          <div class="title"><h2>今日异常诊断</h2><span class="small" id="overviewDate">—</span></div>
+          <div id="overviewAlert"></div>
+          <div style="margin-top:10px;overflow:auto">
+            <table class="diag-table">
+              <thead><tr><th>渠道</th><th>商店评分</th><th>1–2星</th><th>低分占比</th><th>状态</th><th>主要异常</th></tr></thead>
+              <tbody id="diagRows"></tbody>
+            </table>
+          </div>
+          <div class="diag-detail" id="diagDetail">—</div>
         </div>
-        <div class="kt">当前商店评分</div>
-        <div class="health-score" id="asStoreRating">—</div>
-        <div class="health-change" id="asStoreChange">—</div>
-        <div class="health-metrics">
-          <div class="hm"><div class="l">今日文字评论</div><div class="v" id="asReviews">—</div></div>
-          <div class="hm"><div class="l">1–2星评论</div><div class="v" id="asLow">—</div></div>
-          <div class="hm"><div class="l">低分占比</div><div class="v" id="asLowShare">—</div></div>
+
+        <div class="card">
+          <div class="title"><h2>渠道趋势</h2><span class="small">近7天 · 两渠道独立观察</span></div>
+          <div class="channel-trends">
+            <div class="channel-trend-card">
+              <div class="ct-head"><b>Google Play</b><div class="r"><span class="ct-score" id="gpTrendScore">—</span><div class="ct-meta" id="gpTrendMeta">—</div></div></div>
+              <div class="ct-grid">
+                <div class="ct-mini"><div class="t">商店评分</div><div class="ct-spark"><svg id="gpRatingSpark"></svg></div></div>
+                <div class="ct-mini"><div class="t">1–2星评论</div><div class="v" id="gpTrendLow">—</div><div class="ct-spark"><svg id="gpLowSpark"></svg></div></div>
+              </div>
+            </div>
+            <div class="channel-trend-card">
+              <div class="ct-head"><b>App Store</b><div class="r"><span class="ct-score" id="asTrendScore">—</span><div class="ct-meta" id="asTrendMeta">—</div></div></div>
+              <div class="ct-grid">
+                <div class="ct-mini"><div class="t">商店评分</div><div class="ct-spark"><svg id="asRatingSpark"></svg></div></div>
+                <div class="ct-mini"><div class="t">1–2星评论</div><div class="v" id="asTrendLow">—</div><div class="ct-spark"><svg id="asLowSpark"></svg></div></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="health-status small" id="asHealthNote">—</div>
       </div>
     </div>
 
-    <div class="overview-bottom">
+    <div id="allAppsOverview" style="display:none">
       <div class="card">
-        <div class="title"><h2>今日体验状态</h2><span class="small" id="overviewDate">—</span></div>
-        <div id="overviewAlert"></div>
-        <div class="signal-list" style="margin-top:10px">
-          <div class="signal">
-            <b>评分信号</b>
-            <p id="ratingSignal">—</p>
-          </div>
-          <div class="signal">
-            <b>评论信号</b>
-            <p id="commentSignal">—</p>
-          </div>
-          <div class="signal">
-            <b>主要驱动问题</b>
-            <p id="driverSignal">—</p>
-          </div>
+        <div class="title">
+          <div><h2>全部APP异常总览</h2><div class="small" style="margin-top:4px">全部APP模式下不计算任何跨APP、跨渠道综合评分</div></div>
+          <span class="small" id="allAppsDate">—</span>
         </div>
-      </div>
-
-      <div class="card">
-        <div class="title"><h2>近7天快速趋势</h2><span class="small">商店评分与低分评论分开看</span></div>
-        <div class="mini-grid">
-          <div class="mini-card">
-            <div class="mini-title">商店评分</div>
-            <div class="mini-sub" id="miniRatingLabel">Google Play / App Store</div>
-            <div class="mini-chart"><svg id="miniRatingChart"></svg></div>
-          </div>
-          <div class="mini-card">
-            <div class="mini-title">1–2星评论量</div>
-            <div class="mini-sub">按日观察是否突然激增</div>
-            <div class="mini-chart"><svg id="miniLowChart"></svg></div>
-          </div>
-        </div>
+        <div class="allapps-grid" id="allAppsGrid"></div>
       </div>
     </div>
   </section>
@@ -454,73 +477,95 @@ function renderKpis(rows,ds){
 function channelDayMetrics(appName,date,ch){
  let rr=data.filter(r=>(appName==="all"||r.app===appName)&&r.date===date&&r.channel===ch);
  let total=rr.length,low=rr.filter(r=>r.rating<=2).length;
- return {total,low,share:total?low/total:0};
+ let topics={};rr.filter(r=>r.rating<=2).forEach(r=>topics[r.topic]=(topics[r.topic]||0)+1);
+ let top=Object.entries(topics).sort((a,b)=>b[1]-a[1])[0];
+ return {total,low,share:total?low/total:0,top};
 }
-function currentStoreApp(){
- return currentApp()==="all"?"Insta360":currentApp();
+function renderSpark(svgId,values,color){
+ let svg=document.getElementById(svgId);svg.innerHTML="";if(!values.length)return;
+ let W=240,H=62,p=5,iw=W-2*p,ih=H-2*p,lo=Math.min(...values),hi=Math.max(...values);if(hi===lo){hi+=1;lo-=1}
+ let x=i=>p+i*iw/Math.max(1,values.length-1),y=v=>p+ih-(v-lo)/(hi-lo)*ih;
+ let path="";values.forEach((v,i)=>path+=(i?" L ":"M ")+x(i)+" "+y(v));
+ let ph=document.createElementNS("http://www.w3.org/2000/svg","path");ph.setAttribute("d",path);ph.setAttribute("fill","none");ph.setAttribute("stroke",color);ph.setAttribute("stroke-width","2.3");svg.appendChild(ph);
+ let c=document.createElementNS("http://www.w3.org/2000/svg","circle");c.setAttribute("cx",x(values.length-1));c.setAttribute("cy",y(values[values.length-1]));c.setAttribute("r","3");c.setAttribute("fill",color);svg.appendChild(c)
 }
-function renderMiniLine(svgId,seriesList,minY,maxY){
- let svg=document.getElementById(svgId);svg.innerHTML="";if(!seriesList.length)return;
- let W=360,H=105,p={l:8,r:8,t:8,b:10},iw=W-p.l-p.r,ih=H-p.t-p.b;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
- let all=seriesList.flatMap(s=>s.values.map(v=>v.value));
- let lo=minY??Math.min(...all),hi=maxY??Math.max(...all);if(hi===lo){hi+=1;lo-=1}
- const x=i=>p.l+i*iw/(Math.max(1,seriesList[0].values.length-1));
- const y=v=>p.t+ih-(v-lo)/(hi-lo)*ih;
- seriesList.forEach((s,si)=>{
-   let path="";s.values.forEach((d,i)=>path+=(i?" L ":"M ")+x(i)+" "+y(d.value));
-   let ph=document.createElementNS("http://www.w3.org/2000/svg","path");
-   ph.setAttribute("d",path);ph.setAttribute("fill","none");ph.setAttribute("stroke",s.color);ph.setAttribute("stroke-width","2.4");svg.appendChild(ph);
-   let last=s.values[s.values.length-1],c=document.createElementNS("http://www.w3.org/2000/svg","circle");
-   c.setAttribute("cx",x(s.values.length-1));c.setAttribute("cy",y(last.value));c.setAttribute("r","3.5");c.setAttribute("fill",s.color);svg.appendChild(c);
- });
+function renderAllAppsOverview(date){
+ allAppsDate.textContent=date;
+ allAppsGrid.innerHTML=Object.keys(APPS).map(a=>{
+   let gp=channelDayMetrics(a,date,"Google Play"),as=channelDayMetrics(a,date,"App Store");
+   let gph=groups(data.filter(r=>r.app===a&&r.channel==="Google Play"&&r.date<=date&&r.date>=ago(29)));
+   let ash=groups(data.filter(r=>r.app===a&&r.channel==="App Store"&&r.date<=date&&r.date>=ago(29)));
+   let gpi=gph.findIndex(d=>d.date===date),asi=ash.findIndex(d=>d.date===date);
+   let gpa=gpi>=0?anomaly(gph,gpi):false,asa=asi>=0?anomaly(ash,asi):false;
+   let overall=gpa||asa;
+   return `<div class="allapp-card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3>${appDisplay(a)}</h3>${overall?'<span class="badge danger">需关注</span>':'<span class="badge good">正常</span>'}</div>
+      <div class="channel-row"><span>Google Play</span><div class="r"><b>${pct(gp.share)}</b><div class="small">${gp.low}条低分 ${gpa?"· 异常":""}</div></div></div>
+      <div class="channel-row"><span>App Store</span><div class="r"><b>${pct(as.share)}</b><div class="small">${as.low}条低分 ${asa?"· 异常":""}</div></div></div>
+   </div>`
+ }).join("")
 }
 function renderOverview(rows,ds){
  if(!ds.length)return;
- let d=ds[ds.length-1],i=ds.length-1;overviewDate.textContent=d.date;selectedDate=d.date;
- let a=anomaly(ds,i),st=issueStats(rows,d.date,ds);
+ let d=ds[ds.length-1],date=d.date;selectedDate=date;
 
- const storeApp=currentStoreApp();
+ if(currentApp()==="all"){
+   singleAppOverview.style.display="none";
+   allAppsOverview.style.display="block";
+   renderAllAppsOverview(date);
+   return;
+ }
+ singleAppOverview.style.display="block";
+ allAppsOverview.style.display="none";
+ overviewDate.textContent=date;
+
+ const storeApp=currentApp();
  const gpSeries=storeRatingSeries(storeApp,"Google Play");
  const asSeries=storeRatingSeries(storeApp,"App Store");
- const gpNow=gpSeries[gpSeries.length-1].rating,asNow=asSeries[asSeries.length-1].rating;
- const gpPrev=gpSeries[gpSeries.length-2].rating,asPrev=asSeries[asSeries.length-2].rating;
+ const gpNow=gpSeries.at(-1).rating,asNow=asSeries.at(-1).rating;
  const gp7=gpSeries[Math.max(0,gpSeries.length-8)].rating,as7=asSeries[Math.max(0,asSeries.length-8)].rating;
 
- let gpM=channelDayMetrics(currentApp(),d.date,"Google Play");
- let asM=channelDayMetrics(currentApp(),d.date,"App Store");
+ let gpM=channelDayMetrics(storeApp,date,"Google Play"),asM=channelDayMetrics(storeApp,date,"App Store");
 
- gpStoreRating.textContent=gpNow.toFixed(2);
- asStoreRating.textContent=asNow.toFixed(2);
- gpStoreChange.innerHTML=`较昨日 <span class="${gpNow-gpPrev<0?'up':'down'}">${gpNow-gpPrev>=0?'+':''}${(gpNow-gpPrev).toFixed(2)}</span> · 较7日前 ${gpNow-gp7>=0?'+':''}${(gpNow-gp7).toFixed(2)}`;
- asStoreChange.innerHTML=`较昨日 <span class="${asNow-asPrev<0?'up':'down'}">${asNow-asPrev>=0?'+':''}${(asNow-asPrev).toFixed(2)}</span> · 较7日前 ${asNow-as7>=0?'+':''}${(asNow-as7).toFixed(2)}`;
+ let gpHist=groups(data.filter(r=>r.app===storeApp&&r.channel==="Google Play"&&r.date>=from.value&&r.date<=to.value));
+ let asHist=groups(data.filter(r=>r.app===storeApp&&r.channel==="App Store"&&r.date>=from.value&&r.date<=to.value));
+ let gpi=gpHist.findIndex(x=>x.date===date),asi=asHist.findIndex(x=>x.date===date);
+ let gpAn=gpi>=0?anomaly(gpHist,gpi):false,asAn=asi>=0?anomaly(asHist,asi):false;
 
+ gpStoreRating.textContent=gpNow.toFixed(2);asStoreRating.textContent=asNow.toFixed(2);
+ gpStoreChange.innerHTML=`较7日前 <span class="${gpNow-gp7<0?'up':'down'}">${gpNow-gp7>=0?'+':''}${(gpNow-gp7).toFixed(2)}</span>`;
+ asStoreChange.innerHTML=`较7日前 <span class="${asNow-as7<0?'up':'down'}">${asNow-as7>=0?'+':''}${(asNow-as7).toFixed(2)}</span>`;
  gpReviews.textContent=gpM.total;gpLow.textContent=gpM.low;gpLowShare.textContent=pct(gpM.share);
  asReviews.textContent=asM.total;asLow.textContent=asM.low;asLowShare.textContent=pct(asM.share);
 
- const gpRisk=(gpM.share>=.25||gpNow-gp7<=-.03);
- const asRisk=(asM.share>=.25||asNow-as7<=-.03);
- gpStatus.className="badge "+(gpRisk?"danger":"good");gpStatus.textContent=gpRisk?"需关注":"正常";
- asStatus.className="badge "+(asRisk?"danger":"good");asStatus.textContent=asRisk?"需关注":"正常";
- gpHealthNote.textContent=gpRisk?"评分或低分评论出现明显负向信号":"评分与低分评论暂未出现明显异常";
- asHealthNote.textContent=asRisk?"评分或低分评论出现明显负向信号":"评分与低分评论暂未出现明显异常";
+ gpStatus.className="badge "+(gpAn?"danger":"good");gpStatus.textContent=gpAn?"需关注":"正常";
+ asStatus.className="badge "+(asAn?"danger":"good");asStatus.textContent=asAn?"需关注":"正常";
+ gpHealthNote.textContent=gpAn?"低分评论量与占比出现异常":"评分与低分评论暂未出现明显异常";
+ asHealthNote.textContent=asAn?"低分评论量与占比出现异常":"评分与低分评论暂未出现明显异常";
 
- overviewAlert.innerHTML=(gpRisk||asRisk||a)?`<div class="alert"><h3>⚠ 今日体验状态：需要关注</h3><p>当前至少一个渠道出现评分下降或低分评论异常增长，建议继续查看By Day监测和AI分析。</p></div>`:`<div class="alert" style="background:#f7f8fa;border-color:#e5e7eb"><h3 style="color:#30343b">今日体验状态：正常</h3><p style="color:#6b7280">两个渠道的评分和低分评论均未出现明显异常。</p></div>`;
+ overviewAlert.innerHTML=(gpAn||asAn)?`<div class="alert"><h3>⚠ 今日存在渠道异常</h3><p>${gpAn?"Google Play":""}${gpAn&&asAn?"、":""}${asAn?"App Store":""}出现低分评论异常，建议优先查看对应渠道问题。</p></div>`:`<div class="alert" style="background:#f7f8fa;border-color:#e5e7eb"><h3 style="color:#30343b">今日无明显异常</h3><p style="color:#6b7280">Google Play、App Store的评分及低分评论均处于当前观察窗口的正常波动范围。</p></div>`;
 
- ratingSignal.textContent=`Google Play商店评分${gpNow.toFixed(2)}，较7日前${gpNow-gp7>=0?"上升":"下降"}${Math.abs(gpNow-gp7).toFixed(2)}；App Store为${asNow.toFixed(2)}，较7日前${asNow-as7>=0?"上升":"下降"}${Math.abs(asNow-as7).toFixed(2)}。`;
- commentSignal.textContent=`Google Play今日1–2星${gpM.low}条，占${pct(gpM.share)}；App Store今日1–2星${asM.low}条，占${pct(asM.share)}。`;
- driverSignal.textContent=st.length?st.slice(0,3).map(s=>`${s.topic}${s.count}条`).join("、"):"暂无明显集中问题";
+ diagRows.innerHTML=`
+   <tr><td>Google Play</td><td>${gpNow.toFixed(2)} <span class="${gpNow-gp7<0?'up':'down'}">${gpNow-gp7>=0?'+':''}${(gpNow-gp7).toFixed(2)}/7d</span></td><td>${gpM.low}</td><td>${pct(gpM.share)}</td><td>${gpAn?'<span class="badge danger">关注</span>':'<span class="badge good">正常</span>'}</td><td>${gpM.top?gpM.top[0]:"—"}</td></tr>
+   <tr><td>App Store</td><td>${asNow.toFixed(2)} <span class="${asNow-as7<0?'up':'down'}">${asNow-as7>=0?'+':''}${(asNow-as7).toFixed(2)}/7d</span></td><td>${asM.low}</td><td>${pct(asM.share)}</td><td>${asAn?'<span class="badge danger">关注</span>':'<span class="badge good">正常</span>'}</td><td>${asM.top?asM.top[0]:"—"}</td></tr>`;
 
- miniRatingLabel.textContent=`${storeApp} · Google Play / App Store`;
- renderMiniLine("miniRatingChart",[
-   {color:"#202328",values:gpSeries.slice(-7).map(x=>({value:x.rating}))},
-   {color:"#8c82c9",values:asSeries.slice(-7).map(x=>({value:x.rating}))}
- ],Math.min(...gpSeries.slice(-7).map(x=>x.rating),...asSeries.slice(-7).map(x=>x.rating))-.03,
-   Math.max(...gpSeries.slice(-7).map(x=>x.rating),...asSeries.slice(-7).map(x=>x.rating))+.03);
+ let details=[];
+ if(gpAn) details.push(`Google Play需关注：低分评论${gpM.low}条，占${pct(gpM.share)}${gpM.top?`，主要由“${gpM.top[0]}”相关反馈驱动`:""}。`);
+ if(asAn) details.push(`App Store需关注：低分评论${asM.low}条，占${pct(asM.share)}${asM.top?`，主要由“${asM.top[0]}”相关反馈驱动`:""}。`);
+ diagDetail.textContent=details.length?details.join(" "):"两个渠道均未触发低分异常阈值，无需进一步下钻。";
 
- let last7=ds.slice(-7);
- renderMiniLine("miniLowChart",[
-   {color:"#d92d20",values:last7.map(x=>({value:x.low}))}
- ],0,Math.max(10,...last7.map(x=>x.low))*1.15);
+ gpTrendScore.textContent=gpNow.toFixed(2);asTrendScore.textContent=asNow.toFixed(2);
+ gpTrendMeta.textContent=`近7日 ${gpNow-gp7>=0?"+":""}${(gpNow-gp7).toFixed(2)}`;
+ asTrendMeta.textContent=`近7日 ${asNow-as7>=0?"+":""}${(asNow-as7).toFixed(2)}`;
+
+ let gp7days=gpHist.slice(-7),as7days=asHist.slice(-7);
+ gpTrendLow.textContent=`${gp7days.at(-1)?.low||0}条 · ${pct(gp7days.at(-1)?.share||0)}`;
+ asTrendLow.textContent=`${as7days.at(-1)?.low||0}条 · ${pct(as7days.at(-1)?.share||0)}`;
+
+ renderSpark("gpRatingSpark",gpSeries.slice(-7).map(x=>x.rating),"#202328");
+ renderSpark("asRatingSpark",asSeries.slice(-7).map(x=>x.rating),"#8c82c9");
+ renderSpark("gpLowSpark",gp7days.map(x=>x.low),"#d92d20");
+ renderSpark("asLowSpark",as7days.map(x=>x.low),"#d92d20");
 }
 function renderAppStatus(date){
  appStatus.innerHTML=Object.keys(APPS).map(a=>{
