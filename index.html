@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>应用商店低分VOC监测</title>
+<!-- V0.7: 分渠道竞品对比 + 分渠道AI分析助手 -->
 <style>
 :root{
   --bg:#f6f7f9;--panel:#fff;--ink:#17191d;--muted:#747b85;--line:#e6e9ee;
@@ -49,6 +50,20 @@ th{position:sticky;top:0;background:#f8f9fb;color:#666d77;text-align:left;paddin
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.24);z-index:19;display:none}.overlay.open{display:block}
 .dhead{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)}.close{border:0;background:#f0f2f5;width:30px;height:30px;border-radius:8px;cursor:pointer}
 .raw{padding:12px 0;border-bottom:1px solid var(--line)}.raw .m{font-size:10px;color:var(--muted);margin-bottom:5px}.raw .t{font-size:12px;line-height:1.55}
+
+.assistant-card{margin-top:14px;border:1px solid #ddd8f7;background:linear-gradient(180deg,#fff,#fbfaff);border-radius:14px;padding:15px}
+.assistant-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.assistant-title{display:flex;gap:9px;align-items:center}.assistant-icon{width:30px;height:30px;border-radius:9px;background:var(--purple-bg);color:var(--purple);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+.assistant-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:10px}
+.assistant-controls select{min-width:145px}
+.quick-asks{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.quick-ask{border:1px solid #ded9f7;background:#fff;color:#57469b;border-radius:999px;padding:6px 9px;font-size:10px;cursor:pointer}
+.chat{border:1px solid var(--line);background:#fff;border-radius:11px;min-height:230px;max-height:420px;overflow:auto;padding:12px}
+.msg{display:flex;margin:8px 0}.msg.user{justify-content:flex-end}.bubble{max-width:82%;padding:9px 11px;border-radius:11px;font-size:11px;line-height:1.65;white-space:pre-wrap}
+.msg.user .bubble{background:#202328;color:#fff;border-bottom-right-radius:4px}.msg.ai .bubble{background:#f5f3ff;color:#34304a;border-bottom-left-radius:4px}
+.askbar{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.askbar input{border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-size:12px;outline:none}.askbar input:focus{border-color:#aaa1dd}
+.assistant-note{font-size:10px;color:var(--muted);line-height:1.55;margin-top:8px}
+
 @media(max-width:1050px){.grid4,.app-status{grid-template-columns:repeat(2,1fr)}.main,.summary-row,.ai-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -138,9 +153,38 @@ th{position:sticky;top:0;background:#f8f9fb;color:#666d77;text-align:left;paddin
 
   <section id="compare" class="panel">
     <div class="card">
-      <div class="title"><h2>四款APP横向对比</h2><span class="small" id="compareDate">—</span></div>
+      <div class="title">
+        <div>
+          <h2>四款APP横向对比</h2>
+          <div class="small" style="margin-top:4px">只在同一应用商店渠道内比较，不合并Google Play与App Store评分</div>
+        </div>
+        <span class="small" id="compareDate">—</span>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button class="btn primary compare-channel-btn" data-compare-channel="Google Play">Google Play</button>
+        <button class="btn compare-channel-btn" data-compare-channel="App Store">App Store</button>
+      </div>
+
+      <div id="compareInsight" class="alert" style="background:#f7f8fa;border-color:#e5e7eb;margin-bottom:12px">
+        <h3 style="color:#30343b">渠道对比结论</h3>
+        <p style="color:#6b7280">—</p>
+      </div>
+
       <div class="table-wrap"><table>
-        <thead><tr><th>APP</th><th>渠道覆盖</th><th>评论量</th><th>1–2星</th><th>低分占比</th><th>平均评分</th><th>异常状态</th><th>主要低分问题</th></tr></thead>
+        <thead>
+          <tr>
+            <th>APP</th>
+            <th>评论量</th>
+            <th>1星</th>
+            <th>2星</th>
+            <th>1–2星</th>
+            <th>低分占比</th>
+            <th>文字评论平均评分</th>
+            <th>异常状态</th>
+            <th>主要低分问题</th>
+          </tr>
+        </thead>
         <tbody id="compareRows"></tbody>
       </table></div>
     </div>
@@ -158,6 +202,66 @@ th{position:sticky;top:0;background:#f8f9fb;color:#666d77;text-align:left;paddin
         <div class="ai-box"><h3>渠道差异</h3><p id="aiChannel">—</p></div>
         <div class="ai-box"><h3>代表性用户原话</h3><div id="quotes"></div></div>
       </div>
+    </div>
+
+    <div class="assistant-card">
+      <div class="assistant-head">
+        <div class="assistant-title">
+          <div class="assistant-icon">AI</div>
+          <div>
+            <b style="font-size:13px">AI分析助手</b>
+            <div class="small" style="margin-top:3px">基于当前时间范围，在同一应用商店渠道内自由提问两个APP之间的差异</div>
+          </div>
+        </div>
+        <span class="badge purple">数据问答</span>
+      </div>
+
+      <div class="assistant-controls">
+        <label>APP A</label>
+        <select id="assistantA">
+          <option value="Insta360">Insta360</option>
+          <option value="GoPro Quik">GoPro Quik</option>
+          <option value="DJI Mimo">DJI Mimo</option>
+          <option value="CapCut">CapCut（剪映国际版）</option>
+        </select>
+        <span style="font-size:11px;color:var(--muted)">VS</span>
+        <label>APP B</label>
+        <select id="assistantB">
+          <option value="GoPro Quik">GoPro Quik</option>
+          <option value="Insta360">Insta360</option>
+          <option value="DJI Mimo">DJI Mimo</option>
+          <option value="CapCut">CapCut（剪映国际版）</option>
+        </select>
+
+        <label>对比渠道</label>
+        <select id="assistantCompareChannel">
+          <option value="Google Play">Google Play</option>
+          <option value="App Store">App Store</option>
+        </select>
+
+        <span class="small">时间：<b id="assistantRange">—</b></span>
+      </div>
+
+      <div class="quick-asks">
+        <button class="quick-ask" data-q="对比两个APP整体数据差异">对比整体差异</button>
+        <button class="quick-ask" data-q="哪个APP低分问题更严重？">谁的低分更严重</button>
+        <button class="quick-ask" data-q="对比两个APP主要低分问题有什么差异">对比主要问题</button>
+        <button class="quick-ask" data-q="两个APP最近有哪些异常日期？">对比异常日期</button>
+        <button class="quick-ask" data-q="给我一个可以汇报给领导的对比结论">生成汇报结论</button>
+      </div>
+
+      <div class="chat" id="assistantChat">
+        <div class="msg ai"><div class="bubble">你可以直接问我，例如：
+“对比Insta360和GoPro Quik最近14天Google Play低分差异”
+“在App Store里哪个APP的设备连接问题更严重？”
+“帮我总结两个APP最明显的体验差距”</div></div>
+      </div>
+
+      <div class="askbar">
+        <input id="assistantInput" placeholder="输入你的问题，例如：为什么Insta360的低分比Quik高？">
+        <button class="btn primary" id="assistantSend">发送</button>
+      </div>
+      <div class="assistant-note">当前V0.6会直接读取页面中的监测数据进行对比计算并生成回答；后续接入真正的大模型后，可进一步做语义聚类、跨问题归因和更自由的追问。</div>
     </div>
   </section>
 
@@ -222,7 +326,7 @@ function seeded(){
   }
  });return out;
 }
-let data=seeded(),selectedDate=null;
+let data=seeded(),selectedDate=null,compareChannel="Google Play";
 
 function pct(x){return (x*100).toFixed(1)+"%"}
 function currentApp(){return appSel.value}
@@ -281,20 +385,56 @@ function renderByDay(rows,ds){
  bydayAlert.innerHTML=a?`<div class="alert"><h3>⚠ 检测到低分异常</h3><p>1–2星${d.low}条，前7日日均${la.toFixed(1)}条；低分占比${pct(d.share)}，前7日${pct(sa)}。</p></div>`:`<div class="alert" style="background:#f7f8fa;border-color:#e5e7eb"><h3 style="color:#30343b">未达到异常阈值</h3><p style="color:#6b7280">仍可查看当日低分问题构成。</p></div>`;
  let st=issueStats(rows,date,ds);bydayIssues.innerHTML=st.slice(0,6).map(s=>`<div class="issue" onclick="openIssue('${s.topic}','${date}')"><div><div class="iname">${s.topic}</div><div class="imeta">前7日日均${s.avg.toFixed(1)}条</div></div><div class="inum">${s.count}条<span class="rise">${s.avg?((s.rise>=0?"+":"")+(s.rise*100).toFixed(0)+"%"):"新出现"}</span></div></div>`).join("")
 }
+function channelDailyMetrics(appName,date,ch){
+ let rr=data.filter(r=>r.app===appName&&r.date===date&&r.channel===ch);
+ let total=rr.length, one=rr.filter(r=>r.rating===1).length, two=rr.filter(r=>r.rating===2).length;
+ let low=one+two, avg=total?rr.reduce((s,r)=>s+r.rating,0)/total:0, topics={};
+ rr.filter(r=>r.rating<=2).forEach(r=>topics[r.topic]=(topics[r.topic]||0)+1);
+ let top=Object.entries(topics).sort((x,y)=>y[1]-x[1])[0];
+
+ let histRows=data.filter(r=>r.app===appName&&r.channel===ch&&r.date<=date&&r.date>=ago(29));
+ let hist=groups(histRows),idx=hist.findIndex(d=>d.date===date),an=idx>=0?anomaly(hist,idx):false;
+
+ return {app:appName,total,one,two,low,share:total?low/total:0,avg,top,an};
+}
 function renderCompare(date){
- compareDate.textContent=date;compareRows.innerHTML=Object.keys(APPS).map(a=>{
-  let rr=data.filter(r=>r.app===a&&r.date===date),total=rr.length,low=rr.filter(r=>r.rating<=2).length,avg=total?rr.reduce((s,r)=>s+r.rating,0)/total:0,topics={};
-  rr.filter(r=>r.rating<=2).forEach(r=>topics[r.topic]=(topics[r.topic]||0)+1);let top=Object.entries(topics).sort((x,y)=>y[1]-x[1])[0];
-  let hist=groups(data.filter(r=>r.app===a&&r.date<=date&&r.date>=ago(29))),idx=hist.findIndex(d=>d.date===date),an=idx>=0?anomaly(hist,idx):false;
-  return `<tr><td><b>${a==="CapCut"?"CapCut（剪映国际版）":a}</b></td><td>Google Play + App Store</td><td>${total||"—"}</td><td>${low||"—"}</td><td>${total?pct(low/total):"—"}</td><td>${total?avg.toFixed(2):"—"}</td><td>${an?'<span class="badge danger">异常</span>':'<span class="badge good">正常</span>'}</td><td>${top?top[0]+" "+top[1]+"条":"—"}</td></tr>`
- }).join("")
+ compareDate.textContent=`${date} · ${compareChannel}`;
+ let metrics=Object.keys(APPS).map(a=>channelDailyMetrics(a,date,compareChannel));
+
+ compareRows.innerHTML=metrics.map(x=>`
+   <tr>
+     <td><b>${x.app==="CapCut"?"CapCut（剪映国际版）":x.app}</b></td>
+     <td>${x.total||"—"}</td>
+     <td>${x.total?x.one:"—"}</td>
+     <td>${x.total?x.two:"—"}</td>
+     <td>${x.total?x.low:"—"}</td>
+     <td>${x.total?pct(x.share):"—"}</td>
+     <td>${x.total?x.avg.toFixed(2):"—"}</td>
+     <td>${x.an?'<span class="badge danger">异常</span>':'<span class="badge good">正常</span>'}</td>
+     <td>${x.top?x.top[0]+" "+x.top[1]+"条":"—"}</td>
+   </tr>
+ `).join("");
+
+ const valid=metrics.filter(x=>x.total>0).sort((a,b)=>b.share-a.share);
+ let insight="当前渠道暂无足够数据。";
+ if(valid.length>=2){
+   const worst=valid[0],best=valid[valid.length-1],gap=(worst.share-best.share)*100;
+   insight=`${appDisplay(worst.app)}当前低分占比最高，为${pct(worst.share)}；${appDisplay(best.app)}最低，为${pct(best.share)}，相差${gap.toFixed(1)}个百分点。`;
+   if(worst.top) insight+=` ${appDisplay(worst.app)}的主要低分问题为“${worst.top[0]}”。`;
+   if(worst.an) insight+=` 同时${appDisplay(worst.app)}达到低分异常阈值。`;
+ }
+ compareInsight.innerHTML=`<h3 style="color:#30343b">渠道对比结论</h3><p style="color:#6b7280">${insight}</p>`;
+
+ document.querySelectorAll(".compare-channel-btn").forEach(b=>{
+   b.classList.toggle("primary",b.dataset.compareChannel===compareChannel);
+ });
 }
 function renderAI(rows,ds){
  if(!ds.length)return;let date=selectedDate&&ds.some(d=>d.date===selectedDate)?selectedDate:ds[ds.length-1].date,i=ds.findIndex(d=>d.date===date),d=ds[i],st=issueStats(rows,date,ds),top=st.slice(0,3),low=rows.filter(r=>r.date===date&&r.rating<=2),a=anomaly(ds,i);
  aiConclusion.textContent=`${currentApp()==="all"?"全部APP":currentApp()}在${date}共${d.total}条文字评论，其中1–2星${d.low}条，占${pct(d.share)}。${a?"达到低分异常阈值。":"未达到低分异常阈值。"}${top.length?" 主要低分反馈集中在"+top.map(x=>x.topic).join("、")+"。":""}`;
  aiTop.textContent=top.length?top.map(x=>`${x.topic}：${x.count}条，${x.avg?((x.rise>=0?"+":"")+(x.rise*100).toFixed(0)+"% vs 7日日均"):"新出现"}`).join("；"):"暂无";
  let ni=st.find(x=>x.avg<1&&x.count>=3);aiNew.textContent=ni?`“${ni.topic}”当日${ni.count}条，前7日日均不足1条，建议关注是否为新增集中问题。`:"暂未发现明显新增问题簇。";
- let gp=low.filter(r=>r.channel==="Google Play").length,as=low.filter(r=>r.channel==="App Store").length;aiChannel.textContent=`Google Play低分${gp}条，App Store低分${as}条。${gp>as*1.5?"当前更集中在Google Play。":as>gp*1.5?"当前更集中在App Store。":"两渠道量级接近。"}`;
+ let gp=low.filter(r=>r.channel==="Google Play").length,as=low.filter(r=>r.channel==="App Store").length;aiChannel.textContent=`当前AI总结仍基于顶部筛选。Google Play低分${gp}条，App Store低分${as}条。跨渠道仅展示数量，不计算合并平均评分。`;
  clusters.innerHTML=top.map(x=>`<div class="cluster"><div class="cluster-top"><b>${x.topic}</b><span class="badge purple">${x.count}条</span></div><p>${x.avg?`较前7日日均${x.rise>=0?"+":""}${(x.rise*100).toFixed(0)}%`:"前7日极少出现"}。后续接真实AI后，这里会进一步拆成更具体的语义问题簇。</p></div>`).join("");
  let reps=[];top.forEach(x=>{let r=low.find(r=>r.topic===x.topic);if(r)reps.push(r)});quotes.innerHTML=reps.map(r=>`<div class="quote"><span class="badge purple">${r.topic}</span><div class="q">${r.text}</div><div class="m">${r.channel} · ${"★".repeat(r.rating)}</div></div>`).join("")
 }
@@ -309,16 +449,101 @@ function openDate(date){
 function openIssue(topic,date){
  let list=filtered().filter(r=>r.date===date&&r.rating<=2&&r.topic===topic);dtitle.textContent=`${topic} · ${date}`;dbody.innerHTML=list.map(r=>`<div class="raw"><div class="m">${r.app} · ${r.channel} · ${r.user} · ${"★".repeat(r.rating)}</div><div class="t">${r.text}</div></div>`).join("");drawer.classList.add("open");overlay.classList.add("open")
 }
+
+function assistantRows(appName){
+ const f=from.value||"0000-01-01",t=to.value||"9999-12-31";
+ const ch=assistantCompareChannel.value;
+ return data.filter(r=>r.app===appName&&r.date>=f&&r.date<=t&&r.channel===ch);
+}
+function assistantMetrics(appName){
+ const rows=assistantRows(appName), ds=groups(rows), total=rows.length, lowRows=rows.filter(r=>r.rating<=2), low=lowRows.length;
+ const avg=total?rows.reduce((s,r)=>s+r.rating,0)/total:0, share=total?low/total:0, topics={};
+ lowRows.forEach(r=>topics[r.topic]=(topics[r.topic]||0)+1);
+ const top=Object.entries(topics).sort((a,b)=>b[1]-a[1]).slice(0,4);
+ const anomalyDates=ds.map((d,i)=>anomaly(ds,i)?d.date:null).filter(Boolean);
+ return {app:appName,rows,ds,total,low,share,avg,top,anomalyDates};
+}
+function appDisplay(a){return a==="CapCut"?"CapCut（剪映国际版）":a}
+function fmtTop(top){
+ return top.length?top.map(([t,n])=>`${t}${n}条`).join("、"):"暂无集中低分问题";
+}
+function assistantAnswer(question){
+ const a=assistantMetrics(assistantA.value), b=assistantMetrics(assistantB.value), q=(question||"").trim(), ch=assistantCompareChannel.value;
+ if(a.app===b.app)return "请选择两个不同的APP进行比较。";
+ const shareGap=(a.share-b.share)*100, avgGap=a.avg-b.avg, lowGap=a.low-b.low;
+ const worse=a.share>b.share?a:b, better=worse===a?b:a;
+ const topA=a.top[0], topB=b.top[0];
+ let answer="";
+ if(/异常|哪天|日期/.test(q)){
+   answer=`在${ch}渠道、当前观察区间内，${appDisplay(a.app)}检测到${a.anomalyDates.length}个低分异常日${a.anomalyDates.length?"："+a.anomalyDates.join("、"):""}；${appDisplay(b.app)}检测到${b.anomalyDates.length}个异常日${b.anomalyDates.length?"："+b.anomalyDates.join("、"):""}。\n\n`;
+   answer+=a.anomalyDates.length>b.anomalyDates.length?`${appDisplay(a.app)}的异常出现频率更高，建议继续查看这些日期的低分问题聚类。`:a.anomalyDates.length<b.anomalyDates.length?`${appDisplay(b.app)}的异常出现频率更高。`:"两者异常日数量接近。";
+ }else if(/问题|原因|连接|导出|剪辑|崩溃|付费/.test(q)){
+   answer=`在${ch}渠道，${appDisplay(a.app)}的低分问题主要是：${fmtTop(a.top)}。\n${appDisplay(b.app)}的低分问题主要是：${fmtTop(b.top)}。\n\n`;
+   if(topA&&topB){
+     answer+=topA[0]===topB[0]?`两款APP的第一大低分问题都是“${topA[0]}”，但${topA[1]>topB[1]?appDisplay(a.app):appDisplay(b.app)}在当前区间内数量更多。`:`两者低分结构不同：${appDisplay(a.app)}更集中在“${topA[0]}”，${appDisplay(b.app)}更集中在“${topB[0]}”。`;
+   }
+ }else if(/评分|星/.test(q)){
+   answer=`在${ch}渠道，${appDisplay(a.app)}文字评论平均评分为${a.avg.toFixed(2)}，${appDisplay(b.app)}为${b.avg.toFixed(2)}，相差${Math.abs(avgGap).toFixed(2)}分。\n`;
+   answer+=avgGap<0?`${appDisplay(a.app)}当前评分更低，同时其1–2星占比为${pct(a.share)}，高于${appDisplay(b.app)}的${pct(b.share)}。`:`${appDisplay(b.app)}当前评分更低，同时其1–2星占比为${pct(b.share)}，高于${appDisplay(a.app)}的${pct(a.share)}。`;
+ }else if(/低分|严重|谁/.test(q)){
+   answer=`在${ch}渠道，按低分占比看，${appDisplay(worse.app)}更严重：${pct(worse.share)}，${appDisplay(better.app)}为${pct(better.share)}，差${Math.abs(shareGap).toFixed(1)}个百分点。\n`;
+   answer+=`${appDisplay(a.app)}共有${a.low}条1–2星评论，${appDisplay(b.app)}共有${b.low}条。需要同时结合总评论量看，因此低分占比比单纯低分数量更适合横向比较。`;
+ }else{
+   answer=`${ch}渠道当前区间对比：\n`;
+   answer+=`• ${appDisplay(a.app)}：${a.total}条评论，1–2星${a.low}条，低分占比${pct(a.share)}，平均评分${a.avg.toFixed(2)}；主要问题：${fmtTop(a.top)}。\n`;
+   answer+=`• ${appDisplay(b.app)}：${b.total}条评论，1–2星${b.low}条，低分占比${pct(b.share)}，平均评分${b.avg.toFixed(2)}；主要问题：${fmtTop(b.top)}。\n\n`;
+   if(Math.abs(shareGap)>=3){
+     answer+=`最明显差异是低分占比：${appDisplay(worse.app)}比${appDisplay(better.app)}高${Math.abs(shareGap).toFixed(1)}个百分点。`;
+   }else{
+     answer+=`两款APP低分占比差异不大，更值得关注的是具体低分问题结构。`;
+   }
+ }
+ if(/汇报|领导|总结/.test(q)){
+   answer+=`\n\n可汇报结论：在${ch}渠道，当前${appDisplay(worse.app)}的低分压力更高，低分占比为${pct(worse.share)}，对比${appDisplay(better.app)}的${pct(better.share)}。${worse.top[0]?`主要由“${worse.top[0][0]}”相关反馈驱动。`:""}建议优先结合异常日期和原始评论判断是否存在版本性集中问题。`;
+ }
+ return answer;
+}
+function appendAssistant(role,text){
+ const wrap=document.createElement("div");wrap.className="msg "+role;
+ const bubble=document.createElement("div");bubble.className="bubble";bubble.textContent=text;wrap.appendChild(bubble);
+ assistantChat.appendChild(wrap);assistantChat.scrollTop=assistantChat.scrollHeight;
+}
+function askAssistant(q){
+ const question=(q||assistantInput.value).trim();if(!question)return;
+ appendAssistant("user",question);assistantInput.value="";
+ setTimeout(()=>appendAssistant("ai",assistantAnswer(question)),120);
+}
+function refreshAssistantContext(){
+ if(typeof assistantRange!=="undefined"){
+   assistantRange.textContent=`${from.value} 至 ${to.value}`;
+ }
+}
+
 function render(){
  let rows=filtered(),ds=groups(rows);if(!ds.length)return;
  if(!selectedDate||!ds.some(d=>d.date===selectedDate))selectedDate=ds[ds.length-1].date;
  renderKpis(rows,ds);renderOverview(rows,ds);renderByDay(rows,ds);renderCompare(selectedDate);renderAI(rows,ds);renderRaw(rows);
- lastUpdate.textContent=new Date().toLocaleString("zh-CN",{hour12:false})
+ lastUpdate.textContent=new Date().toLocaleString("zh-CN",{hour12:false});refreshAssistantContext()
 }
 function setRange(n){to.value=ago(0);from.value=ago(n-1);selectedDate=null;render()}
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.getElementById(b.dataset.tab).classList.add("active")});
 appSel.onchange=()=>{selectedDate=null;render()};channelSel.onchange=()=>{selectedDate=null;render()};from.onchange=()=>{selectedDate=null;render()};to.onchange=()=>{selectedDate=null;render()};
 document.querySelectorAll("[data-days]").forEach(b=>b.onclick=()=>setRange(Number(b.dataset.days)));
+
+document.querySelectorAll(".compare-channel-btn").forEach(b=>b.onclick=()=>{
+ compareChannel=b.dataset.compareChannel;
+ renderCompare(selectedDate);
+});
+assistantCompareChannel.onchange=()=>{
+ appendAssistant("ai",`已切换到${assistantCompareChannel.value}渠道。后续对比只使用该渠道数据，不混合另一渠道评分。`);
+ refreshAssistantContext();
+};
+
+
+assistantSend.onclick=()=>askAssistant();
+assistantInput.addEventListener("keydown",e=>{if(e.key==="Enter")askAssistant()});
+document.querySelectorAll(".quick-ask").forEach(b=>b.onclick=()=>askAssistant(b.dataset.q));
+
 close.onclick=()=>{drawer.classList.remove("open");overlay.classList.remove("open")};overlay.onclick=close.onclick;
 setRange(14);
 </script>
